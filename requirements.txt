@@ -1,0 +1,15 @@
+tensorflow
+matplotlib
+numpy
+uvicorn[standard]
+sqlalchemy
+psycopg2-binary
+python-dotenv
+alembic
+passlib[bcrypt]
+gunicorn
+python-jose
+pydentic
+python-fasthtml
+apscheduler
+pandas
