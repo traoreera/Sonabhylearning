@@ -20,4 +20,20 @@ class RGDResult(Base):
     predicted_error = Column(Float)
     tolerance = Column(Float)
     created_at = Column(DateTime, default=datetime.utcnow)
-    
+
+
+class KerasResultSimple(Base):
+    __tablename__ = 'resultatsKerasSimple'
+    id = Column(Integer, primary_key=True)
+    predicted_date = Column(String)
+    predicted_error = Column(Float)
+    tolerance = Column(Float)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class KerasResultMulti(Base):
+    __tablename__ = 'resultatsKerasMulti'
+    id = Column(Integer, primary_key=True)
+    predicted_date = Column(String)
+    predicted_error = Column(Float)
+    tolerance = Column(Float)
+    created_at = Column(DateTime, default=datetime.utcnow)
