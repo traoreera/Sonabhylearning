@@ -19,10 +19,6 @@ class KerasLLM:
         
         
         self.records = session.query(Poids).order_by(Poids.date).all()
-        
-        if not self.records:
-            raise ValueError("❌ Aucune donnée disponible pour entraîner le modèle.")
-        
         self.base_date = self.records[0].date.date()
 
         if os.path.exists(self.model_path):
