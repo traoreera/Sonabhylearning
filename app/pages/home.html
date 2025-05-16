@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualisation des Modèles</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        h1 {
+            text-align: center;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        .model {
+            background: #fff;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        canvas {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<h1>Résultats des Modèles</h1>
+
+<div class="container">
+    <div class="model">
+        <h2>Modèle 1</h2>
+        <p><strong>Date d'estimation :</strong> 2025-05-16</p>
+        <p><strong>Erreur prédite :</strong> 1.5 g</p>
+        <p><strong>Tolérance :</strong> 2.0 g</p>
+        <canvas id="chart1"></canvas>
+    </div>
+
+    <div class="model">
+        <h2>Modèle 2</h2>
+        <p><strong>Date d'estimation :</strong> 2025-06-01</p>
+        <p><strong>Erreur prédite :</strong> 1.8 g</p>
+        <p><strong>Tolérance :</strong> 2.0 g</p>
+        <canvas id="chart2"></canvas>
+    </div>
+
+    <div class="model">
+        <h2>Modèle 3</h2>
+        <p><strong>Date d'estimation :</strong> 2025-06-15</p>
+        <p><strong>Erreur prédite :</strong> 1.2 g</p>
+        <p><strong>Tolérance :</strong> 2.0 g</p>
+        <canvas id="chart3"></canvas>
+    </div>
+
+    <div class="model">
+        <h2>Modèle 4</h2>
+        <p><strong>Date d'estimation :</strong> 2025-07-01</p>
+        <p><strong>Erreur prédite :</strong> 1.0 g</p>
+        <p><strong>Tolérance :</strong> 2.0 g</p>
+        <canvas id="chart4"></canvas>
+    </div>
+</div>
+
+<script>
+
+</script>
+
+</body>
+</html>

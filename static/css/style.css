@@ -1,0 +1,26 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 50px;
+    padding: 20px;
+}
+h1 {
+    text-align: center;
+}
+.modelContainer {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 70px;
+    margin-left: 40px;
+}
+.model {
+    background: #fff;
+    padding: 15px;
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    width: 300px;
+    height: 400px;
+}
+canvas {
+    max-width: 100%;
+    height: auto;
+}

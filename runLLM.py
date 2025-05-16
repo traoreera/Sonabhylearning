@@ -1,10 +1,10 @@
+from datetime import datetime
 from app.models.poids import Poids
-from app.models.result import ResulttLineareRegretion, RGDResult,KerasResultSimple,KerasResultMulti
+from app.models.database import get_db
 from app.models.example import inserer_donnees_exemple
 from app.core.core import LineareRegretion,SGDRegretions
 from app.core.keras import KerasLLM, KerasMultiFeatureLLM
-from app.models.database import get_db
-from datetime import datetime
+from app.models.result import ResulttLineareRegretion, RGDResult, KerasResultSimple, KerasResultMulti
 
 
 kerasllm = KerasLLM()
