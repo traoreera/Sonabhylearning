@@ -76,3 +76,49 @@ def LineareRegretion(tolerance):
     predicted_error = model.predict([[jours[-1][0]]])[0]
     joblib.dump(model,'./LLMmodels/LineareRegretion.pkl')
     return predicted_date, predicted_error
+
+
+def RetraineLR():
+    
+    if os.path.exists('./LLMmodels/LineareRegretion.pkl'):
+        model = joblib.load('./LLMmodels/LineareRegretion.pkl')
+    records = session.query(Poids).order_by(Poids.date).all()
+    
+    if len(records) < 2:
+        return None, None
+    else:
+        model = LinearRegression()
+    
+    dates = [p.date for p in records]
+    jours = np.array([(d - dates[0]).days for d in dates]).reshape(-1, 1)
+    erreurs = np.array([abs(p.measured_weight - p.real_weight) * 1000 for p in records])  # en grammes
+
+    
+    model.fit(jours, erreurs)
+    
+    os.makedirs('./LLMmodels', exist_ok=True)
+    joblib.dump(model,'./LLMmodels/LineareRegretion.pkl')
+    return
+
+
+def RetraineSGD():
+    
+    records = session.query(Poids).order_by(Poids.date).all()
+    dates = [p.date for p in records]
+    jours = np.array([(d - dates[0]).days for d in dates]).reshape(-1, 1)
+    erreurs = np.array([abs(p.measured_weight - p.real_weight) * 1000 for p in records])  # en grammes    
+    if os.path.exists('./LLMmodels/sgdRegretion.pkl'):
+        print('file exist loading ... ')
+        model = joblib.load('./LLMmodels/sgdRegretion.pkl')
+        model.partial_fit(jours, erreurs)
+        joblib.dump(model, './LLMmodels/sgdRegretion.pkl')
+    else:
+        print('file not exist creating ... ')
+        model = SGDRegressor(max_iter=1000, tol=1e-3, penalty='l2', random_state=42)
+        model.fit(jours,erreurs)
+        joblib.dump(model, './LLMmodels/sgdRegretion.pkl')
+    
+    model.fit(jours, erreurs)
+    os.makedirs('./LLMmodels', exist_ok=True)
+    joblib.dump(model,'./LLMmodels/sgdRegretion.pkl')
+    return

@@ -2,7 +2,7 @@ from datetime import datetime
 import uuid
 from app.models.database import Base
 from datetime import timedelta
-from sqlalchemy import Column, Integer, String, DateTime, TIMESTAMP
+from sqlalchemy import Column, Integer, String, DateTime, TIMESTAMP, Boolean
 from app.core.hash import Hash
 from app.settings.config import TokenConfiguration 
 
@@ -11,6 +11,7 @@ class AdminBase(Base):
     id = Column(Integer, primary_key=True)
     email = Column(String(50), unique=True, nullable=False)
     password = Column(String(50), nullable=False)
+    active = Column(Boolean, default=Flase)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     def __init__(self, username, password):

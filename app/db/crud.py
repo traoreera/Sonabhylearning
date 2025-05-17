@@ -43,31 +43,36 @@ class UsersCRUD:
 
         if not user:
             return {'message': 'user not found'}
-        if user.verify_password(login_credentials.password):
-            # verified if user as token on database
-            session = self.session.query(UserSession).filter(
-                (UserSession.user_id == user.id) | (UserSession.expirate_at > datetime.utcnow())
-            ).first()
-            token = create_access_token({"email": user.email})
+        
+        if user.active:
+            if user.verify_password(login_credentials.password):
+                # verified if user as token on database
+                session = self.session.query(UserSession).filter(
+                    (UserSession.user_id == user.id) | (UserSession.expirate_at > datetime.utcnow())
+                ).first()
+                token = create_access_token({"email": user.email})
 
-            if not session:
-                session = UserSession(user_id=user.id, token=token)
-                self.session.add(session)
-                self.session.commit()
-                self.session.refresh(session)
-                return {'token': token, 'message': 'login successful'}
-            else:
-                current_user = self.get_user(session.session_key)
-                if current_user:
-                    token = create_access_token({"email": user.email})
-                    session.session_key = token
+                if not session:
+                    session = UserSession(user_id=user.id, token=token)
+                    self.session.add(session)
                     self.session.commit()
                     self.session.refresh(session)
                     return {'token': token, 'message': 'login successful'}
                 else:
-                    return {'message': 'user not found'}
+                    current_user = self.get_user(session.session_key)
+                    if current_user:
+                        token = create_access_token({"email": user.email})
+                        session.session_key = token
+                        self.session.commit()
+                        self.session.refresh(session)
+                        return {'token': token, 'message': 'login successful'}
+                    else:
+                        return {'message': 'user not found'}
+            else:
+                return {'message': 'wrong password or not found user with this id'}
         else:
-            return {'message': 'wrong password or not found user with this id'}
+            
+            return {'message': "user as not activated"}
 
     def get_user(self, token: str) -> AdminBase:
             try:

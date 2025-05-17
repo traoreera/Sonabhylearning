@@ -5,7 +5,6 @@ from app.core.core import LineareRegretion, SGDRegretions
 from app.core.keras import KerasLLM, KerasMultiFeatureLLM
 from app.models.result import ResulttLineareRegretion, RGDResult, KerasResultSimple, KerasResultMulti
 import numpy as np
-
 kerasllm = KerasLLM()
 kerasmultiFeatureLLM = KerasMultiFeatureLLM()
 
@@ -14,7 +13,7 @@ session = next(get_db())
 def convert(value):
     """Convertit les types numpy en types Python natifs."""
     if isinstance(value, (np.float32, np.float64)):
-        return float(value,1)
+        return float(f"{value:.1f}")
     return value
 
 def enter_data(actual_date, real_weight: float, measured_weight: float, tolerance: float):
@@ -67,14 +66,14 @@ def enter_data(actual_date, real_weight: float, measured_weight: float, toleranc
 
     if date_kerasllm:
         session.add(KerasResultSimple(
-            predicted_date=date_kerasllm,
+            predicted_date=datetime.date(date_kerasllm),
             predicted_error=err_kerasllm,
             tolerance=tolerance,
         ))
 
     if date_multi:
         session.add(KerasResultMulti(
-            predicted_date=date_multi,
+            predicted_date=datetime.date(date_multi),
             predicted_error=err_multi,
             tolerance=tolerance,
         ))
@@ -109,6 +108,6 @@ def enter_data(actual_date, real_weight: float, measured_weight: float, toleranc
     return response
 
 
-data = enter_data("2025-05-16", 1.5, 1.6, 2.0)
+data = enter_data("2025-05-17", 11.5, 11.6, 2.0)
 
 print(data)
