@@ -37,21 +37,3 @@
 * L’erreur augmente de **0.5 g par mois**
 * La tolérance est de 2 g
   → Il reste **0.2 g de marge**, soit \~12 jours avant dépassement
-
----
-
-## 🧰 Code Python simplifié :
-
-Souhaites-tu une **application locale simple en terminal ou notebook** ?
-
-Ou bien :
-
-* une **appli avec interface Flet** ?
-* une version avec **visualisation de l’évolution de l’erreur** dans le temps ?
-* une **appli web** pour saisir les données ?
-
-Je peux te générer le code avec :
-
-* la base de données (JSON, TinyDB, CSV…),
-* l’algorithme de suivi et de prédiction,
-* et un système de notification/alerte automatique.

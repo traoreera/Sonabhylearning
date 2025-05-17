@@ -1,86 +1,188 @@
-
-# 📦 Prédiction de Dérive de Poids avec Apprentissage Automatique
-
-Ce projet utilise des modèles de régression (linéaire et SGD) pour estimer la date à laquelle l'erreur entre le poids mesuré et le poids réel dépassera une certaine **tolérance** en grammes.
-
-## 📚 Fonctionnalités
-
-- 📈 Régression linéaire (`LinearRegression`)
-- ⚙️ Régression stochastique (`SGDRegressor`)
-- 🧠 Modèles entraînés sur des données enregistrées en base de données (SQLAlchemy)
-- 📅 Estimation de la date de dépassement de tolérance
-- 💾 Sauvegarde automatique des modèles dans `./LLMmodels/`
+# 🎯 Projet de Prédiction de Dérive de Poids
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENCE.md)
+[![FastAPI](https://img.shields.io/badge/FastAPI-🚀-green)](https://fastapi.tiangolo.com/)
+[![Made with TensorFlow](https://img.shields.io/badge/Made%20with-TensorFlow-orange)](https://www.tensorflow.org/)
+[![Made with Keras](https://img.shields.io/badge/Made%20with-Keras-orange)](https://keras.io/)
+[![Made with scikit-learn](https://img.shields.io/badge/Made%20with-scikit-learn-orange)](https://scikit-learn.org/)
+[![Made with uvicorn](https://img.shields.io/badge/Made%20with-uvicorn-orange)](https://www.uvicorn.org/)
+[![Chart.js](https://img.shields.io/badge/Chart.js-📊-blueviolet)](https://www.chartjs.org/)
+[![Status](https://img.shields.io/badge/status-en%20cours-yellow)]() <br>
+Ce projet vise à **prédire la dérive de poids** à l’aide de modèles d’apprentissage automatique, et à **visualiser dynamiquement** les résultats via un dashboard web.
 
 ---
 
-## 🔧 Dépendances
+## 🗂️ Structure du projet
 
-Assurez-vous d'avoir les bibliothèques suivantes installées :
+```
+.
+├── app/                      # Code principal de l'application
+│   ├── auth/                # Authentification JWT, gestion des tokens
+│   ├── compoments/          # Composants UI pour l’interface
+│   ├── core/                # Fonctions principales, modèles ML (Keras)
+│   ├── db/                  # Schémas Pydantic & opérations CRUD
+│   ├── models/              # Modèles SQLAlchemy (Poids, Résultats, Admin)
+│   ├── pages/               # Templates HTML et logique associée
+│   ├── routes/              # Endpoints FastAPI pour l’auth, les modèles, etc.
+│   └── settings/            # Configuration centrale de l’application
+├── static/                  # Ressources statiques (CSS, JS)
+├── docs/                    # Documentation technique du projet
+├── initdb.py                # Script d’initialisation de la base de données
+├── runLLM.py                # Lancement des modèles de prédiction
+├── task.py                  # Tâches automatisées ou périodiques
+├── main.py                  # Point d’entrée principal de l’application
+├── base_de_donnees.db       # Base de données SQLite
+├── requirements.txt         # Dépendances Python
+├── README.md                # Ce fichier
+└── LICENCE.md               # Licence du projet
+```
+
+---
+
+## ⚙️ Technologies utilisées
+
+### Backend
+
+* **Python 3.11+**
+* **FastAPI (fasthtml)** – Création rapide d’API
+* **SQLAlchemy** – ORM pour manipuler la base de données
+* **Pydantic** – Validation des données entrantes/sortantes
+* **TensorFlow / Keras** – Réseaux de neurones pour la prédiction
+* **scikit-learn** – Régression linéaire et autres modèles
+* **uvicorn** – Serveur ASGI ultra rapide
+
+### Frontend
+
+* **HTML / CSS / JavaScript**
+* **Chart.js** – Visualisation des erreurs prédictives
+* **Fetch API** – Requêtes AJAX régulières pour actualiser les graphiques
+
+---
+
+## 🚀 Lancement du projet
+
+### 1. Cloner le dépôt
 
 ```bash
-pip install tensorflow matplotlib numpy uvicorn[standard] sqlalchemy psycopg2-binary python-dotenv alembic passlib[bcrypt] gunicorn python-jose pydentic python-fasthtml apscheduler pandas
-````
-
----
-
-## 🧠 Modèles utilisés
-
-### Linear Regression
-
-```python
-from sklearn.linear_model import LinearRegression
+git clone https://github.com/mon-utilisateur/poids-drift-project.git
+cd poids-drift-project
 ```
 
-* Apprentissage complet à chaque appel
-* Sauvegarde du modèle dans `./LLMmodels/LineareRegretion.pkl`
+### 2. Installer les dépendances
 
-### SGD Regressor
-
-```python
-from sklearn.linear_model import SGDRegressor
+```bash
+pip install -r requirements.txt
 ```
 
-* Apprentissage incrémental avec `partial_fit`
-* Sauvegarde dans `./LLMmodels/sgdRegretion.pkl`
+### 3. Lancer le serveur
 
----
+```bash
+uvicorn main:app --reload
+```
 
-## ⚙️ Utilisation des fonctions
+### 4. Accéder au dashboard
 
-### 1. `LineareRegretion(tolerance: int) -> (datetime, float)`
+Ouvrir dans le navigateur :
 
-Prédit la date de dépassement de la tolérance à l'aide d'une régression linéaire.
-
-### 2. `SGDRegretions(tolerance: int) -> (datetime, float)`
-
-Pareil mais avec régression SGD (entraînement incrémental).
-
----
-
-## 🧪 Exemple d'exécution
-
-```python
-tolerance = 3000  # en grammes
-date_predite, erreur_predite = LineareRegretion(tolerance)
-print(f"📅 Dépassement estimé le {date_predite} avec une erreur de {erreur_predite:.2f} g")
+```
+http://localhost:8000/dashboard
 ```
 
 ---
 
-## 🛠 Pré-requis
+## 🔄 Fonctionnement
 
-* Base de données contenant des objets `Poids`
-* Champs requis : `date`, `real_weight`, `measured_weight`, `tolerance`
+1. L’utilisateur soumet un poids réel, un poids mesuré et une tolérance.
+2. Plusieurs modèles (ML, Deep Learning) calculent les erreurs de prédiction.
+3. Les résultats sont stockés en base de données.
+4. Le frontend (Chart.js) interroge les API toutes les **6 secondes** :
+
+```
+/models/model1/
+/models/model2/
+/models/model3/
+/models/model4/
+```
+
+Chacune retourne :
+
+```json
+{
+  "error": [1.2, 1.3, 1.1, ...],
+  "data": [1.5, 1.6, 1.8, ...]
+}
+```
 
 ---
 
-## 📌 Avertissement
+## 📊 Visualisation (Dashboard)
 
-> Les modèles ne fonctionneront correctement que si les données suivent une tendance croissante ou décroissante significative de l’erreur. Les modèles ne détecteront **aucune dérive** si les erreurs sont aléatoires ou stables.
+* Chaque graphique représente un modèle.
+* Les erreurs sont affichées mois par mois.
+* Les données sont rafraîchies automatiquement toutes les 6 secondes via `fetch()`.
 
 ---
 
-## 📬 Contributeurs
+## 📦 Exemple de modèle de prédiction
 
-* 🤖 Modèle de régression : scikit-learn
-* 🧑‍💻 Auteur : \[traoreera]
+```python
+from keras.models import Sequential
+from keras.layers import Dense
+
+model = Sequential([
+    Dense(64, activation='relu', input_shape=(3,)),
+    Dense(32, activation='relu'),
+    Dense(1)
+])
+model.compile(optimizer='adam', loss='mse')
+```
+
+---
+
+## ✅ Fonctionnalités
+
+* [x] Prédiction en temps réel de la dérive de poids
+* [x] Sauvegarde automatique des résultats
+* [x] Dashboard interactif mis à jour régulièrement
+* [x] Support multi-modèles
+* [x] Authentification avec JWT
+
+---
+
+## 🔒 Sécurité
+
+* Authentification via tokens JWT
+* Protection des endpoints sensibles
+* Gestion des utilisateurs dans `models/admin.py`
+
+---
+
+## 📚 Documentation
+
+Les fichiers suivants apportent des détails techniques :
+
+* `docs/explain1.md` – Description générale du projet [[1]](./docs/explain1.md)
+* `docs/ia.md` – Détails sur les modèles d'intelligence artificielle utilisés [[2]](./docs/ia.md)
+
+---
+
+## 🔧 Améliorations futures
+
+* 🔐 Système d'utilisateurs avec rôles
+* 🧾 Export CSV / Excel / PDF des résultats
+* 📈 Visualisation des performances historiques
+* 🧠 Intégration de nouveaux modèles LLM ou hybrides
+
+---
+
+## 🧑‍💻 Auteurs
+
+* **👤 Myriade Technologie**
+* 📧 [traoreera@gmail.com](mailto:traoreera@gmail.com)
+
+---
+
+## 🪪 Licence
+
+Ce projet est open-source sous licence **MIT**.
+Voir [`LICENCE.md`](./LICENCE.md) pour plus d’informations.
