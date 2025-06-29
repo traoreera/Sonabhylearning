@@ -2,8 +2,10 @@ from fasthtml.common import *
 from app.routes import AuthRoute
 from app.routes import home
 from app.routes import modelLLm
-#from task.runTask import task
-from app.pages.home import Index, license, explain, ia
+from task.runTask import task
+from app.pages.home import OtherPages
+
+other = OtherPages()
 
 
 app, rt = fast_app(live=True, debug=True,static_path='./static')
@@ -15,32 +17,29 @@ modelLLm.router.to_app(app)
 
 @rt('/', ['GET'])
 def index():
-    return Index()
+    return other.Index()
 
 
 
 @rt('/LICENCE', ['GET'])
 def licence():
-    return license()
+    return other.license()
 
 @rt("/explain")
 def explainDocs():
-    return explain()
+    return other.explain()
 
 @rt('/ia')
 def iaDocs():
-    return ia()
+    return other.ia()
 
 #create 404 not found page
 @app.on_event("startup")
-async def startup_event():
-    pass
-    #task.scheduler.start()
+async def startup_event():task.scheduler.start()
 
 @app.on_event("shutdown")
-async def shutdown_event():
-    pass
-    #task.scheduler.shutdown()
+async def shutdown_event():task.scheduler.shutdown()
+
 if __name__ == "__main__":
     
     serve(host="0.0.0.0", port=5000,)   

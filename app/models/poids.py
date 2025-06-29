@@ -10,4 +10,12 @@ class Poids(Base):
     date = Column(DateTime)
     real_weight = Column(Float)
     measured_weight = Column(Float)
-    tolerance = Column(Float, default=2.0)
+    tolerance = Column(Float, default=0.02)
+    
+    def responseModels(self):
+        return {
+            "date": self.date,
+            "real_weight": self.real_weight,
+            "measured_weight": self.measured_weight,
+            "tolerance": self.tolerance
+        }

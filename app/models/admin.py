@@ -11,12 +11,12 @@ class AdminBase(Base):
     id = Column(Integer, primary_key=True)
     email = Column(String(50), unique=True, nullable=False)
     password = Column(String(50), nullable=False)
-    active = Column(Boolean, default=Flase)
+    active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     def __init__(self, username, password):
         self.email = username
-        self.password = password
+        self.password = Hash.bcrypt(password=password)
     
     def responseModel(self):
         return{

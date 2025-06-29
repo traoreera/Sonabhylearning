@@ -8,7 +8,7 @@ bord = DashBord()
 
 router = APIRouter(prefix="/dashbord")
 
-#@Auth.token_validate_decorator
 @router('/', ['GET'])
+#@Auth.token_validate_decorator
 def dashbord(session,):
     return bord.page()

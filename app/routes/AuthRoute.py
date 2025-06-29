@@ -3,7 +3,7 @@ from app.auth import Auth
 from ..pages.auth import login_pages, add_user
 from ..db.crud import UsersCRUD
 from ..models.database import get_db
-
+from ..models.admin import AdminBase
 
 userCrud = UsersCRUD(next(get_db()))
 router = APIRouter(prefix="/auth")
@@ -35,9 +35,11 @@ def register(session):
 
 @router(path="/register",methods=["POST"])
 def registerPost(session, email:str, password: str):
-    print(email, password)
-    return 'register'
-
+    response =userCrud.add(
+        admin= AdminBase(username=email,password=password)
+    )
+    if response:
+        return Redirect('/login')
 
 
 

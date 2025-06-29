@@ -3,6 +3,7 @@ from http.client import HTTPException
 from sqlalchemy.orm import Session
 from app.models.admin import AdminBase, UserSession
 from app.models.result import RGDResult,KerasResultMulti, KerasResultSimple, ResulttLineareRegretion
+from app.models.poids import Poids
 from app.db.schemas import Login
 from app.auth.token import verify_token, create_access_token
 
@@ -97,8 +98,6 @@ class UsersCRUD:
             return True
         else:
             return False
-        
-
 
 class ModelsCRUD:
     def __init__(self, session:Session):
@@ -132,3 +131,30 @@ class ModelsCRUD:
         dataM = [i.predicted_date for i in response]
         
         return error, dataM
+
+class Difter:
+    
+    def __init__(self, session: Session):
+        
+        self.session = session
+    
+    
+    def add(self,poid:Poids):
+        self.session.add(poid)
+        return poid
+    
+    def get_alls(self):
+        return [i.responseModels() for i in self.session.query(Poids).all()]
+    
+    
+    def commiting(self,poid: Poids):
+        try:
+            self.session.commit()
+            self.session.refresh(poid)
+            return True
+        except Exception as e : 
+            self.session.rollback()
+            print(e)
+            raise
+        
+            return False
