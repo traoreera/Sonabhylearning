@@ -1,164 +1,356 @@
-import csv
-import numpy as np
+import shutil
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi.responses import HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
-from sqlalchemy import create_engine, Column, Integer, Float, String, DateTime
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from sklearn.linear_model import LinearRegression, SGDRegressor
+import numpy as np
+from microframe.engine import TemplateEngine
+from app.tools.csv import CSVTools
 
-# --- Configuration de la base de données ---
-Base = declarative_base()
+# ==================== MODÈLES PYDANTIC ====================
+from app.schemas import SinglePredictionRequest, BatchPredictionRequest, ToleranceBreachRequest, RetrainRequest
 
-class Poids(Base):
-    __tablename__ = 'poids'
-    id = Column(Integer, primary_key=True)
-    date = Column(DateTime)
-    real_weight = Column(Float)
-    measured_weight = Column(Float)
-    tolerance = Column(Float, default=2.0)
-
-class Resultat(Base):
-    __tablename__ = 'resultats'
-    id = Column(Integer, primary_key=True)
-    predicted_date = Column(String)
-    predicted_error = Column(Float)
-    tolerance = Column(Float)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-# --- Initialisation de la base de données ---
-engine = create_engine('sqlite:///base_de_donnees.db')
-Base.metadata.create_all(engine)
-Session = sessionmaker(bind=engine)
-session = Session()
-
-# --- Insertion de données d'exemple ---
-def inserer_donnees_exemple():
-    if session.query(Poids).count() == 0:
-        base_date = datetime(2023, 1, 1)
-        real_weight = 70.0
-        tolerance = 3000
-        for i in range(10):
-            date = base_date + timedelta(days=i)
-            measured = real_weight + 0.2 * i
-            p = Poids(date=date, real_weight=real_weight, measured_weight=measured, tolerance=tolerance)
-            session.add(p)
-        session.commit()
-        print("✅ Données d'exemple insérées.")
-
-# --- Prédiction ---
-def predire_derivation(tolerance):
-    records = session.query(Poids).order_by(Poids.date).all()
-    if len(records) < 2:
-        return None, None
-
-    dates = [p.date for p in records]
-    jours = np.array([(d - dates[0]).days for d in dates]).reshape(-1, 1)
-    erreurs = np.array([abs(p.measured_weight - p.real_weight) * 1000 for p in records])  # en grammes
-
-    model = LinearRegression()
-    model.fit(jours, erreurs)
-
-    if model.coef_[0] <= 0:
-        return dates[-1], erreurs[-1]  # pas de dérive détectée
-
-    jours_tolerance = (tolerance - model.intercept_) / model.coef_[0]
-
-    if jours_tolerance < 0:
-        return datetime.now(), erreurs[-1]
-
-    predicted_date = dates[0] + timedelta(days=int(jours_tolerance))
-    predicted_error = model.predict([[jours[-1][0]]])[0]
-
-    return predicted_date, predicted_error
+# Importer vos modèles
+from app.IA import DriftRegressor, WeightErrorRegressor
 
 
 
-# --- Entrée de nouvelles données ---
-def enter_data():
+
+# Initialiser FastAPI
+app = FastAPI(
+    title="API de Prédiction de Dérive de Poids",
+    description="API pour prédire les erreurs de mesure de poids",
+    version="1.0.0"
+)
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Templates
+templates = TemplateEngine(directory="./templates",)
+
+
+
+# Initialiser les modèles au démarrage
+weight_model = None
+drift_model = None
+
+@app.on_event("startup")
+async def load_models():
+    global weight_model, drift_model
     try:
-        date_input = input("Entrez la date (YYYY-MM-DD) : ").strip()
-        date_obj = datetime.strptime(date_input, "%Y-%m-%d")
-        real_weight = float(input("Entrez le poids réel (kg) : "))
-        measured_weight = float(input("Entrez le poids mesuré (kg) : "))
-        tolerance = float(input("Entrez la tolérance (g) : "))
-    except ValueError:
-        print("❌ Entrée invalide. Réessayez.")
-        return
+        weight_model = WeightErrorRegressor()
+        drift_model = DriftRegressor(model_type="sgd", tolerance=100, model_dir="models")
+        print("✅ Modèles chargés avec succès")
+    except Exception as e:
+        print(f"❌ Erreur lors du chargement des modèles: {e}")
 
-    error = abs(measured_weight - real_weight) * 1000  # en grammes
 
-    poids = Poids(
-        date=date_obj,
-        real_weight=real_weight,
-        measured_weight=measured_weight,
-        tolerance=tolerance
-    )
-    session.add(poids)
-    session.commit()
 
-    print(f"📏 Erreur calculée : {error:.2f} g")
+# ==================== ROUTES HTML ====================
 
-    predicted_date, predicted_error = predire_derivation(tolerance)
-    if predicted_date:
-        print(f"🔮 Date estimée de dépassement de tolérance : {predicted_date.date()}")
-        print(f"📉 Erreur prédite ce jour-là : {predicted_error:.2f} g")
+@app.get("/", response_class=HTMLResponse)
+async def root(request: Request):
+    """Page d'accueil avec l'interface de prédiction"""
+    return await templates.render("index.html",request=request)
 
-        res = Resultat(
-            predicted_date=predicted_date.strftime("%Y-%m-%d"),
-            predicted_error=predicted_error,
-            tolerance=tolerance
-        )
-        session.add(res)
-        session.commit()
-    else:
-        print("❌ Modèle non trouvé. Entraînement insuffisant (minimum 2 enregistrements).")
 
-# --- Affichage des prédictions ---
-def afficher_resultats():
-    print("\n📊 Historique des prédictions :")
-    resultats = session.query(Resultat).order_by(Resultat.created_at.desc()).all()
-    if not resultats:
-        print("Aucune prédiction enregistrée.")
-        return
-    for res in resultats:
-        print(f"📅 {res.predicted_date} | Tolérance : {res.tolerance:.2f} g | Erreur prédite : {res.predicted_error:.2f} g | Ajouté le : {res.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
+@app.get("/docs-page", response_class=HTMLResponse)
+async def docs_page(request: Request):
+    """Page de documentation"""
+    return await templates.render("docs.html", {"request": request})
 
-# --- Export CSV ---
-def exporter_csv():
-    resultats = session.query(Resultat).order_by(Resultat.created_at).all()
-    if not resultats:
-        print("⚠️ Aucun résultat à exporter.")
-        return
 
-    filename = f"historique_predictions_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-    with open(filename, mode='w', newline='', encoding='utf-8') as f:
-        writer = csv.writer(f)
-        writer.writerow(["Date Prédite", "Erreur Prédite (g)", "Tolérance (g)", "Créé le"])
-        for r in resultats:
-            writer.writerow([r.predicted_date, f"{r.predicted_error:.2f}", f"{r.tolerance:.2f}", r.created_at.strftime('%Y-%m-%d %H:%M:%S')])
-    print(f"✅ Résultats exportés dans le fichier : {filename}")
+@app.get('/load-data', response_class=HTMLResponse)
+async def load_data(request: Request):
+    return await templates.render("load_data.html", {"request": request})
 
-# --- Menu principal ---
-if __name__ == "__main__":
-    inserer_donnees_exemple()
 
-    while True:
-        print("\n=== Menu ===")
-        print("1. Entrer de nouvelles données")
-        print("2. Afficher l'historique des prédictions")
-        print("3. Exporter l'historique (CSV)")
-        print("4. Quitter")
 
-        choix = input("Votre choix : ").strip()
-        if choix == "1":
-            enter_data()
-        elif choix == "2":
-            afficher_resultats()
-        elif choix == "3":
-            exporter_csv()
-        elif choix == "4":
-            break
+
+# ==================== ROUTES API ====================
+
+@app.get("/api/health")
+async def health_check():
+    """Vérifier l'état de santé du service"""
+    return {
+        "status": "healthy" if (weight_model and drift_model) else "degraded",
+        "models": {
+            "weight_model": weight_model is not None,
+            "drift_model": drift_model is not None
+        },
+        "timestamp": datetime.now().isoformat()
+    }
+
+
+@app.get("/api/models/info")
+async def models_info():
+    """Obtenir les informations sur les modèles"""
+    info = {
+        "weight_model": {
+            "loaded": weight_model is not None,
+            "type": "Neural Network (WeightErrorRegressor)",
+        },
+        "drift_model": {
+            "loaded": drift_model is not None,
+            "type": drift_model.model_type.upper() if drift_model else None,
+        }
+    }
+    
+    if weight_model:
+        metrics = weight_model.evaluate()
+        info["weight_model"]["metrics"] = metrics
+        info["weight_model"]["dataset_size"] = len(weight_model.records)
+    
+    if drift_model:
+        metrics = drift_model.evaluate()
+        info["drift_model"]["metrics"] = metrics
+        info["drift_model"]["dataset_size"] = len(drift_model.errors) if drift_model.errors is not None else 0
+        info["drift_model"]["tolerance"] = drift_model.tolerance
+    
+    return info
+
+
+@app.post("/api/predictions/single")
+async def predict_single(request: SinglePredictionRequest):
+    """Prédire l'erreur pour une date et des poids spécifiques"""
+    if weight_model is None:
+        raise HTTPException(status_code=503, detail="Modèle non disponible")
+    
+    try:
+        date = datetime.strptime(request.date, '%Y-%m-%d')
+        predicted_error = weight_model.predict(date, request.poids_attendu, request.poids_mesure)
+        current_error = abs(request.poids_attendu - request.poids_mesure) * 1000
+        
+        # Déterminer le statut
+        if predicted_error < 50:
+            status, severity = "OK", "success"
+        elif predicted_error < 100:
+            status, severity = "Attention", "warning"
         else:
-            print("❌ Choix invalide. Veuillez réessayer.")
+            status, severity = "Critique", "error"
+        
+        return {
+            "success": True,
+            "date": request.date,
+            "poids_attendu": request.poids_attendu,
+            "poids_mesure": request.poids_mesure,
+            "current_error_g": round(current_error, 2),
+            "predicted_error_g": round(predicted_error, 2),
+            "difference_g": round(predicted_error - current_error, 2),
+            "status": status,
+            "severity": severity,
+            "days_from_now": (date - datetime.now()).days
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-    session.close()
+
+@app.post("/api/predictions/batch")
+async def predict_batch(request: BatchPredictionRequest):
+    """Prédire l'erreur sur une plage de dates"""
+    if weight_model is None:
+        raise HTTPException(status_code=503, detail="Modèle non disponible")
+    
+    try:
+        start_date = datetime.strptime(request.start_date, '%Y-%m-%d')
+        end_date = datetime.strptime(request.end_date, '%Y-%m-%d')
+        days_diff = (end_date - start_date).days
+        
+        # Générer les dates
+        dates = [start_date + timedelta(days=i) for i in range(days_diff + 1)]
+        poids_attendus = [request.poids_attendu] * len(dates)
+        poids_mesures = [request.poids_mesure] * len(dates)
+        
+        # Prédiction par lot
+        predictions = weight_model.predict_batch(dates, poids_attendus, poids_mesures)
+        
+        # Construire les résultats
+        results = []
+        for i, (date, error) in enumerate(zip(dates, predictions)):
+            if error < 50:
+                status, severity = "OK", "success"
+            elif error < 100:
+                status, severity = "Attention", "warning"
+            else:
+                status, severity = "Critique", "error"
+            
+            results.append({
+                "date": date.strftime('%Y-%m-%d'),
+                "poids_attendu": request.poids_attendu,
+                "poids_mesure": request.poids_mesure,
+                "predicted_error_g": round(float(error), 2),
+                "status": status,
+                "severity": severity,
+                "day_index": i
+            })
+        
+        # Statistiques
+        errors = [r['predicted_error_g'] for r in results]
+        stats = {
+            "total_predictions": len(results),
+            "avg_error_g": round(float(np.mean(errors)), 2),
+            "max_error_g": round(float(np.max(errors)), 2),
+            "min_error_g": round(float(np.min(errors)), 2),
+            "std_error_g": round(float(np.std(errors)), 2),
+            "ok_count": sum(1 for r in results if r['severity'] == 'success'),
+            "warning_count": sum(1 for r in results if r['severity'] == 'warning'),
+            "error_count": sum(1 for r in results if r['severity'] == 'error')
+        }
+        
+        return {
+            "success": True,
+            "start_date": request.start_date,
+            "end_date": request.end_date,
+            "statistics": stats,
+            "predictions": results
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/predictions/tolerance-breach")
+async def tolerance_breach(request: ToleranceBreachRequest):
+    """Trouver quand l'erreur dépassera la tolérance"""
+    if weight_model is None:
+        raise HTTPException(status_code=503, detail="Modèle non disponible")
+    
+    try:
+        start_date = datetime.strptime(request.start_date, '%Y-%m-%d')
+        
+        breach_date = weight_model.predict_tolerance_breach(
+            request.tolerance_g, start_date, 
+            request.poids_attendu, request.poids_mesure, 
+            request.days_limit
+        )
+        
+        if breach_date:
+            days_until = (breach_date - datetime.now()).days
+            predicted_error = weight_model.predict(breach_date, request.poids_attendu, request.poids_mesure)
+            
+            urgency = "urgent" if days_until <= 7 else "attention" if days_until <= 30 else "normal"
+            
+            return {
+                "success": True,
+                "breach_detected": True,
+                "breach_date": breach_date.strftime('%Y-%m-%d'),
+                "days_until_breach": days_until,
+                "predicted_error_g": round(predicted_error, 2),
+                "tolerance_g": request.tolerance_g,
+                "urgency": urgency
+            }
+        else:
+            return {
+                "success": True,
+                "breach_detected": False,
+                "message": f"Aucun dépassement prévu dans les {request.days_limit} prochains jours",
+                "tolerance_g": request.tolerance_g
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/predictions/drift-analysis")
+async def drift_analysis(tolerance: float = 100):
+    """Obtenir l'analyse complète de la dérive"""
+    if drift_model is None:
+        raise HTTPException(status_code=503, detail="Modèle de dérive non disponible")
+    
+    try:
+        drift_model.refresh_data()
+        summary ="drif model "
+        drift_rate_g_per_day = drift_model.evaluate()['drift_rate_kg_per_day'] if drift_model else None
+        
+        return {
+            "success": True,
+            "drift_summary": summary,
+            "drift_rate_g_per_day": drift_rate_g_per_day,
+            "breach_date": drift_model.get_date_tolerance_breach(),
+            "days_until_breach": len(drift_model.errors) if drift_model.errors is not None else 0
+        }
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/predictions/retrain")
+async def retrain_models(request: RetrainRequest = RetrainRequest()):
+    """Réentraîner les modèles avec les dernières données"""
+    results = {}
+    
+    if request.model in ['weight', 'both']:
+        if weight_model is None:
+            results['weight'] = {"success": False, "error": "Modèle non disponible"}
+        else:
+            try:
+                weight_model.retrain()
+                metrics = weight_model.evaluate()
+                results['weight'] = {
+                    "success": True,
+                    "metrics": metrics,
+                    "message": "Modèle de prédiction d'erreur réentraîné"
+                }
+            except Exception as e:
+                results['weight'] = {"success": False, "error": str(e)}
+    
+    if request.model in ['drift', 'both']:
+        if drift_model is None:
+            results['drift'] = {"success": False, "error": "Modèle non disponible"}
+        else:
+            try:
+                success = drift_model.train()
+                weight_model.retrain() # type: ignore
+                if success:
+                    metrics = drift_model.evaluate()
+                    results['drift'] = {
+                        "success": True,
+                        "metrics": metrics,
+                        "message": "Modèle de dérive réentraîné"
+                    }
+                else:
+                    results['drift'] = {"success": False, "error": "Échec du réentraînement"}
+            except Exception as e:
+                results['drift'] = {"success": False, "error": str(e)}
+    
+    return {"success": True, "results": results}
+
+
+
+@app.post("/api/upload-csv")
+async def upload_csv(file: UploadFile = File(...)):
+    if not file.filename.endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Le fichier doit être un CSV")
+
+    # Chemin temporaire
+    save_path = f"./downloads/{file.filename}"
+
+    try:
+        # Sauvegarde du fichier
+        with open(save_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        # Lecture / Import DB
+        csv = CSVTools(file=save_path)
+        success = csv.importCSV()
+
+        return {
+            "filename": file.filename,
+            "status": "success" if success else "failed",
+            "message": "CSV importé avec succès" if success else "Erreur lors de l'import"
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur lors du traitement: {e}")
+
+
+# ==================== LANCER L'APPLICATION ====================
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)

@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prédiction de Dérive - FastAPI</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.4.19/dist/full.min.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- PapaParse for CSV parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <style>
+        /* small helpers */
+        .csv-preview {
+            max-height: 350px;
+            overflow: auto;
+        }
+    </style>
+</head>
+
+<body class="bg-base-00 text-base-content p-6">
+    <div class="navbar bg-base-100 shadow-lg">
+        <div class="flex-1">
+            <a href="/" class="btn btn-ghost normal-case text-xl">
+                <i class="fas fa-weight-scale mr-2"></i>
+                Prédicteur de Dérive FastAPI
+            </a>
+        </div>
+
+        <div class="flex-none gap-2">
+            <a href="/load-data" class="btn btn-ghost btn-sm">
+                <i class="fas fa-file-upload mr-2"></i>
+                Load Data
+            </a>
+            <a href="/docs" class="btn btn-ghost btn-sm">
+                <i class="fas fa-book mr-2"></i>
+                API Docs
+            </a>
+            <label class="swap swap-rotate">
+                <input type="checkbox" id="themeToggle" />
+                <i class="fas fa-sun swap-on text-2xl"></i>
+                <i class="fas fa-moon swap-off text-2xl"></i>
+            </label>
+        </div>
+    </div>
+    <div class="card bg-base-100 shadow-lg">
+        <div class="card-body">
+            <h1 class="card-title">CSV Uploader & Preview</h1>
+            <p class="text-sm opacity-70">Uploadez un fichier CSV (dates en ISO ou timestamp). Colonnes attendues:
+                <code>date, real_weight, measured_weight, tolerance</code>.
+            </p>
+
+            <div class="mt-4 grid gap-4 md:grid-cols-2">
+                <label class="input-group">
+                    <span class="w-32">Fichier CSV</span>
+                    <input id="file-input" type="file" accept=".csv" class="input input-bordered w-full" />
+                </label>
+
+                <div class="flex items-center gap-2">
+                    <button id="btn-parse" class="btn btn-primary">Parcourir et importer</button>
+                    <button id="btn-send" class="btn btn-secondary">Envoyer au serveur</button>
+                    <button id="btn-clear" class="btn btn-ghost">Réinitialiser</button>
+                </div>
+            </div>
+
+            <div id="dropzone" class="mt-4 p-6 border-2 border-dashed border-base-300 rounded-lg text-center text-sm">
+                Glisser-déposer un fichier CSV ici</div>
+
+            <div class="mt-4">
+                <div id="status" class="badge">Aucun fichier chargé</div>
+            </div>
+
+            <div class="mt-4 csv-preview">
+                <table id="preview" class="table w-full">
+                    <thead></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <div class="mt-4">
+                <pre id="report" class="whitespace-pre-wrap text-sm"></pre>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const btnSend = document.getElementById('btn-send');
+        const btnClear = document.getElementById('btn-clear');
+        const status = document.getElementById('status');
+        const report = document.getElementById('report');
+
+        function setStatus(text, type = 'info') {
+            status.textContent = text;
+            status.className = 'badge ' + (type === 'error' ? 'badge-error' : (type === 'success' ? 'badge-success' : ''));
+        }
+
+        // Envoyer le fichier CSV via multipart/form-data
+        btnSend.addEventListener('click', async () => {
+            const file = fileInput.files[0];
+            if (!file) {
+                setStatus('Aucun fichier sélectionné', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            setStatus("Envoi en cours...");
+
+            try {
+                const resp = await fetch("/api/upload-csv", {
+                    method: "POST",
+                    body: formData
+                });
+
+                if (!resp.ok) throw new Error(await resp.text());
+                const json = await resp.json();
+                setStatus("Envoyé ✔", "success");
+                report.textContent = JSON.stringify(json, null, 2);
+            } catch (err) {
+                setStatus("Erreur envoi", "error");
+                report.textContent = String(err);
+            }
+        });
+
+        // Réinitialiser
+        btnClear.addEventListener('click', () => {
+            fileInput.value = '';
+            report.textContent = '';
+            setStatus('Aucun fichier chargé');
+        });
+    </script>
+
+</body>
+
+</html>

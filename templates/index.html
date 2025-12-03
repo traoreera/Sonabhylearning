@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prédiction de Dérive - FastAPI</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.4.19/dist/full.min.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body class="bg-base-200 min-h-screen">
+    <!-- Navbar -->
+    <div class="navbar bg-base-100 shadow-lg">
+        <div class="flex-1">
+            <a href="/" class="btn btn-ghost normal-case text-xl">
+                <i class="fas fa-weight-scale mr-2"></i>
+                Prédicteur de Dérive FastAPI
+            </a>
+        </div>
+
+        <div class="flex-none gap-2">
+            <a href="/load-data" class="btn btn-ghost btn-sm">
+                <i class="fas fa-file-upload mr-2"></i>
+                Load Data
+            </a>
+            <a href="/docs" class="btn btn-ghost btn-sm">
+                <i class="fas fa-book mr-2"></i>
+                API Docs
+            </a>
+            <button id="retrainModels" class="btn btn-ghost btn-sm" type="submit">
+                <i class="fas fa-redo mr-2"></i>
+                Retrain Models
+            </button>
+            <label class="swap swap-rotate">
+                <input type="checkbox" id="themeToggle" />
+                <i class="fas fa-sun swap-on text-2xl"></i>
+                <i class="fas fa-moon swap-off text-2xl"></i>
+            </label>
+        </div>
+    </div>
+
+    <div class="container mx-auto p-4 max-w-6xl">
+        <!-- Stats Header -->
+        <div class="stats shadow w-full mb-6 bg-base-100">
+            <div class="stat">
+                <div class="stat-figure text-primary">
+                    <i class="fas fa-exclamation-triangle text-3xl"></i>
+                </div>
+                <div class="stat-title">Erreur Actuelle</div>
+                <div class="stat-value text-primary" id="currentError">-- g</div>
+                <div class="stat-desc">Dernière mesure</div>
+            </div>
+
+            <div class="stat">
+                <div class="stat-figure text-secondary">
+                    <i class="fas fa-chart-line text-3xl"></i>
+                </div>
+                <div class="stat-title">Taux de Dérive</div>
+                <div class="stat-value text-secondary" id="driftRate">-- g/jour</div>
+                <div class="stat-desc">Tendance observée</div>
+            </div>
+
+            <div class="stat">
+                <div class="stat-figure text-warning">
+                    <i class="fas fa-calendar-alt text-3xl"></i>
+                </div>
+                <div class="stat-title">Dépassement Tolérance</div>
+                <div class="stat-value text-warning" id="breachDate">--</div>
+                <div class="stat-desc" id="breachDesc">Aucune prédiction</div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Prédiction Ponctuelle -->
+            <div class="card bg-base-100 shadow-xl">
+                <div class="card-body">
+                    <h2 class="card-title">
+                        <i class="fas fa-calculator mr-2"></i>
+                        Prédiction Ponctuelle
+                    </h2>
+
+                    <form id="singlePredictionForm" class="space-y-4">
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Date de prédiction</span>
+                            </label>
+                            <input type="date" name="date" class="input input-bordered" required>
+                        </div>
+
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Poids Attendu (kg)</span>
+                            </label>
+                            <input type="number" name="expected" step="0.001" class="input input-bordered"
+                                placeholder="5.250" required>
+                        </div>
+
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Poids Mesuré (kg)</span>
+                            </label>
+                            <input type="number" name="measured" step="0.001" class="input input-bordered"
+                                placeholder="5.245" required>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-full">
+                            <i class="fas fa-play mr-2"></i>
+                            Prédire
+                        </button>
+                    </form>
+
+                    <div id="singleResult" class="alert hidden mt-4">
+                        <i class="fas fa-info-circle"></i>
+                        <div>
+                            <h3 class="font-bold">Résultat</h3>
+                            <div class="text-sm" id="singleResultText"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Prédiction par Lot -->
+            <div class="card bg-base-100 shadow-xl">
+                <div class="card-body">
+                    <h2 class="card-title">
+                        <i class="fas fa-layer-group mr-2"></i>
+                        Prédiction par Lot
+                    </h2>
+
+                    <form id="batchPredictionForm" class="space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="form-control">
+                                <label class="label">
+                                    <span class="label-text">Date début</span>
+                                </label>
+                                <input type="date" name="startDate" class="input input-bordered" required>
+                            </div>
+
+                            <div class="form-control">
+                                <label class="label">
+                                    <span class="label-text">Date fin</span>
+                                </label>
+                                <input type="date" name="endDate" class="input input-bordered" required>
+                            </div>
+                        </div>
+
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Poids Attendu (kg)</span>
+                            </label>
+                            <input type="number" name="expected" step="0.001" class="input input-bordered"
+                                placeholder="5.250" required>
+                        </div>
+
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Poids Mesuré (kg)</span>
+                            </label>
+                            <input type="number" name="measured" step="0.001" class="input input-bordered"
+                                placeholder="5.245" required>
+                        </div>
+
+                        <button type="submit" class="btn btn-secondary w-full">
+                            <i class="fas fa-play-circle mr-2"></i>
+                            Prédire la Plage
+                        </button>
+                    </form>
+
+                    <div id="batchResult" class="alert hidden mt-4">
+                        <i class="fas fa-chart-bar"></i>
+                        <div class="w-full">
+                            <h3 class="font-bold">Résultats</h3>
+                            <div class="text-sm" id="batchResultText"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tableau des résultats -->
+        <div class="card bg-base-100 shadow-xl mt-6 hidden" id="resultsTable">
+            <div class="card-body">
+                <h2 class="card-title">
+                    <i class="fas fa-table mr-2"></i>
+                    Résultats Détaillés
+                </h2>
+                <div class="overflow-x-auto">
+                    <table class="table table-zebra">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Poids Attendu</th>
+                                <th>Poids Mesuré</th>
+                                <th>Erreur Prédite</th>
+                                <th>Statut</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tolérance -->
+        <div class="card bg-base-100 shadow-xl mt-6">
+            <div class="card-body">
+                <h2 class="card-title">
+                    <i class="fas fa-sliders-h mr-2"></i>
+                    Dépassement de Tolérance
+                </h2>
+
+                <form id="toleranceForm" class="space-y-4">
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Tolérance (g)</span>
+                        </label>
+                        <input type="number" name="tolerance" value="100" class="input input-bordered" required>
+                    </div>
+
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Date de Début</span>
+                        </label>
+                        <input type="date" name="startDate" class="input input-bordered" required>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Poids Attendu (kg)</span>
+                            </label>
+                            <input type="number" name="expected" step="0.001" class="input input-bordered" required>
+                        </div>
+
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Poids Mesuré (kg)</span>
+                            </label>
+                            <input type="number" name="measured" step="0.001" class="input input-bordered" required>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-warning w-full">
+                        <i class="fas fa-search mr-2"></i>
+                        Trouver Date de Dépassement
+                    </button>
+                </form>
+
+                <div id="toleranceResult" class="alert hidden mt-4">
+                    <i class="fas fa-bell"></i>
+                    <div>
+                        <h3 class="font-bold">Résultat</h3>
+                        <div class="text-sm" id="toleranceResultText"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Modal -->
+    <dialog id="loadingModal" class="modal">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg">Calcul en cours...</h3>
+            <div class="flex justify-center py-4">
+                <span class="loading loading-spinner loading-lg"></span>
+            </div>
+        </div>
+    </dialog>
+
+    <script>
+        const API_BASE = window.location.origin;
+
+        // Theme
+        const themeToggle = document.getElementById('themeToggle');
+        const html = document.documentElement;
+
+        themeToggle.addEventListener('change', () => {
+            const theme = themeToggle.checked ? 'dark' : 'light';
+            html.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+        });
+
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        html.setAttribute('data-theme', savedTheme);
+        themeToggle.checked = savedTheme === 'dark';
+
+        // Dates par défaut
+        const today = new Date().toISOString().split('T')[0];
+        document.querySelectorAll('input[type="date"]').forEach(input => {
+            if (!input.value) input.value = today;
+        });
+
+        // Charger stats
+        async function loadStats() {
+            try {
+                const res = await fetch(`${API_BASE}/api/predictions/drift-analysis`);
+                if (res.ok) {
+                    const data = await res.json();
+                    document.getElementById('currentError').textContent = `${data.current_error_g?.toFixed(2) || '--'} g`;
+                    document.getElementById('driftRate').textContent = `${data.drift_rate_g_per_day?.toFixed(2) || '--'} g/jour`;
+                    document.getElementById('breachDate').textContent = `${data.days_until_breach} jours`;
+                    document.getElementById('breachDesc').textContent = `Prévu le ${new Date(data.breach_date).toLocaleDateString('fr-FR')}`;
+
+                }
+            } catch (e) {
+                console.error('Erreur stats:', e);
+            }
+        }
+
+        // Prédiction unique
+        document.getElementById('singlePredictionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+
+            document.getElementById('loadingModal').showModal();
+
+            try {
+                const res = await fetch(`${API_BASE}/api/predictions/single`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        date: form.date.value,
+                        poids_attendu: parseFloat(form.expected.value),
+                        poids_mesure: parseFloat(form.measured.value)
+                    })
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) throw new Error(data.detail || 'Erreur');
+
+                const result = document.getElementById('singleResult');
+                const text = document.getElementById('singleResultText');
+
+                result.classList.remove('hidden', 'alert-success', 'alert-warning', 'alert-error');
+                result.classList.add(`alert-${data.severity}`);
+
+                text.innerHTML = `
+                    <strong>Statut:</strong> ${data.status}<br>
+                    <strong>Erreur prédite:</strong> ${data.predicted_error_g} g<br>
+                    <strong>Erreur actuelle:</strong> ${data.current_error_g} g
+                `;
+            } catch (err) {
+                alert('Erreur: ' + err.message);
+            } finally {
+                document.getElementById('loadingModal').close();
+            }
+        });
+
+        // Prédiction par lot
+        document.getElementById('batchPredictionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+
+            document.getElementById('loadingModal').showModal();
+
+            try {
+                const res = await fetch(`${API_BASE}/api/predictions/batch`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        start_date: form.startDate.value,
+                        end_date: form.endDate.value,
+                        poids_attendu: parseFloat(form.expected.value),
+                        poids_mesure: parseFloat(form.measured.value)
+                    })
+                });
+
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Erreur');
+
+                const result = document.getElementById('batchResult');
+                const text = document.getElementById('batchResultText');
+
+                result.classList.remove('hidden');
+                text.innerHTML = `
+                    <strong>Prédictions:</strong> ${data.statistics.total_predictions}<br>
+                    <strong>Erreur moyenne:</strong> ${data.statistics.avg_error_g} g<br>
+                    <strong>Erreur max:</strong> ${data.statistics.max_error_g} g
+                `;
+
+                // Tableau
+                const tbody = document.getElementById('resultsTableBody');
+                tbody.innerHTML = data.predictions.map(p => `
+                    <tr>
+                        <td>${new Date(p.date).toLocaleDateString('fr-FR')}</td>
+                        <td>${p.poids_attendu.toFixed(3)}</td>
+                        <td>${p.poids_mesure.toFixed(3)}</td>
+                        <td><strong>${p.predicted_error_g}</strong></td>
+                        <td><span class="badge badge-${p.severity}">${p.status}</span></td>
+                    </tr>
+                `).join('');
+
+                document.getElementById('resultsTable').classList.remove('hidden');
+            } catch (err) {
+                alert('Erreur: ' + err.message);
+            } finally {
+                document.getElementById('loadingModal').close();
+            }
+        });
+
+        // Tolérance
+        document.getElementById('toleranceForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+
+            document.getElementById('loadingModal').showModal();
+
+            try {
+                const res = await fetch(`${API_BASE}/api/predictions/tolerance-breach`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        tolerance_g: parseFloat(form.tolerance.value),
+                        start_date: form.startDate.value,
+                        poids_attendu: parseFloat(form.expected.value),
+                        poids_mesure: parseFloat(form.measured.value)
+                    })
+                });
+
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Erreur');
+
+                const result = document.getElementById('toleranceResult');
+                const text = document.getElementById('toleranceResultText');
+
+                result.classList.remove('hidden', 'alert-success', 'alert-warning', 'alert-error', 'alert-info');
+
+                if (data.breach_detected) {
+                    const cls = data.urgency === 'urgent' ? 'alert-error' :
+                        data.urgency === 'attention' ? 'alert-warning' : 'alert-info';
+                    result.classList.add(cls);
+
+                    text.innerHTML = `
+                        <strong>Date:</strong> ${new Date(data.breach_date).toLocaleDateString('fr-FR')}<br>
+                        <strong>Dans:</strong> ${data.days_until_breach} jours<br>
+                        <strong>Erreur:</strong> ${data.predicted_error_g} g
+                    `;
+                } else {
+                    result.classList.add('alert-success');
+                    text.textContent = data.message;
+                }
+            } catch (err) {
+                alert('Erreur: ' + err.message);
+            } finally {
+                document.getElementById('loadingModal').close();
+            }
+        });
+
+        // Charger au démarrage
+        window.addEventListener('load', loadStats);
+
+        document.getElementById("retrainModels").addEventListener("click", async (e) => {
+            e.preventDefault();
+            try {
+                document.getElementById('loadingModal').showModal();
+                const res = await fetch(`${API_BASE}/api/predictions/retrain`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: "both"
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Erreur');
+                document.getElementById('loadingModal').close();
+            } catch (err) {
+                document.getElementById('loadingModal').close();
+                alert('Erreur: ' + err.message);
+            }
+
+        }
+        )
+
+    </script>
+</body>
+
+</html>

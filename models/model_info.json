@@ -1,0 +1,20 @@
+{
+    "model_name": "WeightErrorRegressor",
+    "version": "1.0.0",
+    "last_update": "2025-12-02 15:49:15",
+    "dataset_size": 405,
+    "base_date": "2024-01-01",
+    "metrics": {
+        "MAE": 17.824745178222656,
+        "RMSE": 25.827405417607647,
+        "MAPE": 3616900096.0
+    },
+    "seed": 42,
+    "input_features": [
+        "days_since_start",
+        "expected_weight",
+        "measured_weight"
+    ],
+    "model_path": "./models/weight_error.keras",
+    "scaler_path": "./models/scaler.pkl"
+}

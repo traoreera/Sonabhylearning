@@ -1,31 +1,34 @@
+from time import sleep
 import pandas as pd
+from datetime import datetime
+from sqlalchemy.exc import SQLAlchemyError
 from app.db.crud import Difter
-from app.models.database import get_db
-from app.models.poids import Poids
-
-differ = Difter(next(get_db()))
+from app.database import get_db
+from app.models import Poids
 
 class CSVTools:
     
     def __init__(self, file:str):
-        
         try:
+            self.session=next(get_db())
+            self.differ = Difter(self.session)
             self.df = pd.read_csv(file)
         except:
-            raise 'file as been not read ...'
+            raise FileNotFoundError("File not found")
     
     
     def importCSV(self):
         try:
-            for column, row in self.df.iterrows():
-                date = float(row['date'])
-                real_weight = float(row['real_weight'])
-                mesured_weight = row['measured_weight']
-                tolerance = row['tolerance']
-                poids = Poids(date=date, real_weight=real_weight, measured_weight=mesured_weight, tolerance=tolerance)
-                differ.add(poids)
-            differ.commiting(poids)
-            return True
-        except Exception as e :
-            differ.session.rollback()
-            return False, e
+            for _, row in self.df.iterrows():  
+                p = Poids(
+                    date=datetime.strptime(row['date'], '%Y-%m-%d'),
+                    real_weight=row['real_weight'],
+                    measured_weight=row['measured_weight'],
+                    tolerance=row['tolerance']
+                )
+                print(f"Imported {row['date']} with real weight {row['real_weight']} and measured weight {row['measured_weight']}")
+                self.session.add(p)
+                self.session.commit()
+                sleep(0.1)
+        except Exception as e:
+            print(e)
